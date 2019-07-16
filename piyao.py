@@ -14,7 +14,7 @@ main_page_url = 'http://piyao.sina.cn/'
 chrome_driver_path = ""
 
 if platform.system()=='Windows':
-    chrome_driver_path = "chromedriver.exe"
+    chrome_driver_path = 'chromedriver.exe'
 elif platform.system()=='Linux' or platform.system()=='Darwin':
     chrome_driver_path = "./chromedriver"
 else:
@@ -29,22 +29,72 @@ executable_path= chrome_driver_path)
 driver.get(main_page_url)
 time.sleep(1)
 
-news = driver.find_elements_by_xpath('//div[@class="left_title"]') # 谣言的内容
-likes = driver.find_elements_by_xpath('//div[@class="like_text"]') # 点赞数
+# 获取页面初始高度
+js = "return action=document.body.scrollHeight"
+height = driver.execute_script(js)
 
-news_list=[]
-likes_list=[]
-for t in news:
-    news_list.append(t.text)
+# 将滚动条调整至页面底部
+driver.execute_script('window.scrollTo(0, document.body.scrollHeight)')
+time.sleep(5)
 
-for t in likes:
-    likes_list.append(t.text)
+#定义初始时间戳（秒）
+t1 = int(time.time())
 
-dict1=dict(zip(news_list,likes_list))
+#定义循环标识，用于终止while循环
+status = True
 
-dict2=sorted(dict1.items(),key=lambda x:x[1],reverse=True)
+# 重试次数
+num=0
 
-for k,v in dict2:
-    print(k,v)
+while num < 30:
+	# 获取当前时间戳（秒）
+    t2 = int(time.time())
+    # 判断时间初始时间戳和当前时间戳相差是否大于30秒，小于30秒则下拉滚动条
+    if t2-t1 < 30:
+        new_height = driver.execute_script(js)
+        if new_height > height :
+            time.sleep(1)
+            driver.execute_script('window.scrollTo(0, document.body.scrollHeight)')
+            # 重置初始页面高度
+            height = new_height
+            # 重置初始时间戳，重新计时
+            t1 = int(time.time())
+    num = num+1
+
+dict1 = {}
+news_and_likes_and_dates = []
+#sortedlist = []
+
+i = 1
+
+while i<=30:
+    news = driver.find_elements_by_xpath('//div[@class="zy_day" and position()='+str(i)+']/div[@class="day_date"]/following-sibling::ul//div[@class="left_title"]')
+    likes = driver.find_elements_by_xpath('//div[@class="zy_day" and position()='+str(i)+']/div[@class="day_date"]/following-sibling::ul//div[@class="like_text"]')
+    dates = driver.find_elements_by_xpath('//div[@class="zy_day" and position()='+str(i)+']/div[@class="day_date"]')
+    news_list = []
+    dates_list = []
+    likes_list = []
+    for t in news:
+        news_list.append(t.text)
+    for t in likes:
+        likes_list.append(int(t.text))
+    for t in dates:
+        dates_list.append(t.text)
+    dates_list = dates_list * len(likes_list)
+    i = i+1
+
+    x = 0
+    for x in range(0,len(likes_list)):
+        dict1.setdefault(news_list[x],[]).append(likes_list[x])
+        dict1.setdefault(news_list[x],[]).append(dates_list[x])
+
+sortedlist = sorted(dict1.items(), key=lambda x : x[1][0],reverse = True)
+
+for x in sortedlist[:10]:
+    print('点赞数:', x[1][0], '\t','时间：',x[1][1],'\t',x[0])
+
 quit()
+
+
+
 
